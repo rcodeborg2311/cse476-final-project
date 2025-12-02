@@ -1,5 +1,6 @@
 from .api import call_model_chat_completions
 import re
+from typing import Optional
 
 def extract_final(text: str) -> str:
     text = text.strip()
@@ -11,7 +12,7 @@ def extract_final(text: str) -> str:
 def solve_math(prompt: str) -> str:
     system = (
         "You are an expert math solver. "
-        "You may reason silently, but you MUST end your output with: FINAL_ANSWER: <answer>"
+        "You may reason internally, but you MUST end your output with: FINAL_ANSWER: <answer>"
     )
     r = call_model_chat_completions(prompt, system=system, temperature=0.2)
     return extract_final(r["text"] or "")
@@ -32,7 +33,7 @@ def solve_generic(prompt: str) -> str:
     r = call_model_chat_completions(prompt, system=system)
     return extract_final(r["text"] or "")
 
-def solve_one(question: str, domain: str | None = None) -> str:
+def solve_one(question: str, domain: Optional[str] = None) -> str:
     if domain == "math":
         return solve_math(question)
     if domain == "coding":
