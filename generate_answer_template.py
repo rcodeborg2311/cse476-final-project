@@ -1,81 +1,69 @@
 #!/usr/bin/env python3
-"""
-Generate a placeholder answer file that matches the expected auto-grader format.
-
-Replace the placeholder logic inside `build_answers()` with your own agent loop
-before submitting so the ``output`` fields contain your real predictions.
-
-Reads the input questions from cse_476_final_project_test_data.json and writes
-an answers JSON file where each entry contains a string under the "output" key.
-"""
-
-from __future__ import annotations
 
 import json
+import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, List
 from agent.agent_loop import solve_one
 
-
 INPUT_PATH = Path("cse_476_final_project_test_data.json")
 OUTPUT_PATH = Path("cse_476_final_project_answers.json")
 
-
 def load_questions(path: Path) -> List[Dict[str, Any]]:
     with path.open("r") as fp:
-        data = json.load(fp)
-    if not isinstance(data, list):
-        raise ValueError("Input file must contain a list of question objects.")
-    return data
+        return json.load(fp)
 
+def show_progress(i, total, start):
+    done = i / total
+    bar_len = 30
+    filled = int(done * bar_len)
+    bar = "█" * filled + "░" * (bar_len - filled)
+    elapsed = time.time() - start
+    rate = i / elapsed if elapsed > 0 else 0
+    left = (total - i) / rate if rate > 0 else 0
+    sys.stdout.write(
+        f"\r[{bar}] {done*100:5.1f}%  "
+        f"({i}/{total})  "
+        f"elapsed: {elapsed:6.1f}s  "
+        f"left: {left:6.1f}s  "
+        f"speed: {rate:4.1f}/s"
+    )
+    sys.stdout.flush()
 
 def build_answers(questions):
-    answers = []
-    for q in questions:
+    out = []
+    total = len(questions)
+    start = time.time()
+    for i, q in enumerate(questions, start=1):
         inp = q["input"]
         domain = q.get("domain")
-        result = solve_one(inp, domain)
-        answers.append({"output": result.strip()})
-    return answers
+        res = solve_one(inp, domain)
+        out.append({"output": res.strip()})
+        show_progress(i, total, start)
+    print()
+    return out
 
-
-def validate_results(
-    questions: List[Dict[str, Any]], answers: List[Dict[str, Any]]
-) -> None:
+def validate_results(questions, answers):
     if len(questions) != len(answers):
-        raise ValueError(
-            f"Mismatched lengths: {len(questions)} questions vs {len(answers)} answers."
-        )
-    for idx, answer in enumerate(answers):
-        if "output" not in answer:
-            raise ValueError(f"Missing 'output' field for answer index {idx}.")
-        if not isinstance(answer["output"], str):
-            raise TypeError(
-                f"Answer at index {idx} has non-string output: {type(answer['output'])}"
-            )
-        if len(answer["output"]) >= 5000:
-            raise ValueError(
-                f"Answer at index {idx} exceeds 5000 characters "
-                f"({len(answer['output'])} chars). Please make sure your answer does not include any intermediate results."
-            )
+        raise ValueError("length mismatch")
+    for idx, ans in enumerate(answers):
+        if "output" not in ans:
+            raise ValueError(f"missing output at {idx}")
+        if not isinstance(ans["output"], str):
+            raise TypeError(f"output not string at {idx}")
+        if len(ans["output"]) >= 5000:
+            raise ValueError(f"output too long at {idx}")
 
-
-def main() -> None:
+def main():
     questions = load_questions(INPUT_PATH)
     answers = build_answers(questions)
-
     with OUTPUT_PATH.open("w") as fp:
         json.dump(answers, fp, ensure_ascii=False, indent=2)
-
     with OUTPUT_PATH.open("r") as fp:
-        saved_answers = json.load(fp)
-    validate_results(questions, saved_answers)
-    print(
-        f"Wrote {len(answers)} answers to {OUTPUT_PATH} "
-        "and validated format successfully."
-    )
-
+        saved = json.load(fp)
+    validate_results(questions, saved)
+    print(f"wrote {len(saved)} answers to {OUTPUT_PATH}")
 
 if __name__ == "__main__":
     main()
-
